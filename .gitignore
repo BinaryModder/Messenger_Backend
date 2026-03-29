@@ -36,3 +36,6 @@ logs/
 
 *.mypy_cache
 
+#Macos
+.DS_Store
+
