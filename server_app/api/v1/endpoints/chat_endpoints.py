@@ -9,6 +9,7 @@ from schemas.message_schemas import MessageCreate, MessageUpdate, MessageRespons
 router = APIRouter(prefix="/api/v1/chats", tags=["chats"])
 
 
+# ============ CHAT ENDPOINTS ============
 
 @router.post("", response_model=ChatResponse, status_code=status.HTTP_201_CREATED)
 def create_chat(chat_data: ChatCreate, db: Session = Depends(get_db)):
@@ -69,14 +70,18 @@ def delete_chat(chat_id: int, db: Session = Depends(get_db)):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
+# ============ MESSAGE ENDPOINTS ============
 
 @router.post("/{chat_id}/messages", response_model=MessageResponse, status_code=status.HTTP_201_CREATED)
 def create_message(chat_id: int, message_data: MessageCreate, db: Session = Depends(get_db)):
+    # Проверяем существование чата
+    chat = ChatService.get_chat_by_id(db, chat_id)
+    if not chat:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Chat not found")
     
-    chat = ChatService.get_chat_by_id(db, chat_id)
-    if not chat:
+    # Убеждаемся что chat_id в пути совпадает с телом запроса
+    if message_data.chat_id != chat_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, 
             detail="chat_id in path does not match chat_id in request body")
@@ -94,6 +99,9 @@ def create_message(chat_id: int, message_data: MessageCreate, db: Session = Depe
 
 @router.get("/{chat_id}/messages", response_model=list[MessageResponse])
 def get_messages(chat_id: int, skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    # Проверяем существование чата
+    chat = ChatService.get_chat_by_id(db, chat_id)
+    if not chat:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Chat not found")
     
@@ -103,6 +111,9 @@ def get_messages(chat_id: int, skip: int = 0, limit: int = 100, db: Session = De
 
 @router.get("/{chat_id}/messages/{message_id}", response_model=MessageResponse)
 def get_message(chat_id: int, message_id: int, db: Session = Depends(get_db)):
+    # Проверяем существование чата
+    chat = ChatService.get_chat_by_id(db, chat_id)
+    if not chat:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Chat not found")
     
@@ -121,9 +132,13 @@ def get_message(chat_id: int, message_id: int, db: Session = Depends(get_db)):
 
 @router.patch("/{chat_id}/messages/{message_id}", response_model=MessageResponse)
 def update_message(chat_id: int, message_id: int, message_data: MessageUpdate, db: Session = Depends(get_db)):
+    # Проверяем существование чата
+    chat = ChatService.get_chat_by_id(db, chat_id)
+    if not chat:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Chat not found")
     
+    # Проверяем существование сообщения и что оно в этом чате
     existing_message = MessageService.get_message_by_id(db, message_id)
     if not existing_message:
         raise HTTPException(
@@ -146,9 +161,13 @@ def update_message(chat_id: int, message_id: int, message_data: MessageUpdate, d
 
 @router.delete("/{chat_id}/messages/{message_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_message(chat_id: int, message_id: int, db: Session = Depends(get_db)):
+    # Проверяем существование чата
+    chat = ChatService.get_chat_by_id(db, chat_id)
+    if not chat:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Chat not found")
     
+    # Проверяем существование сообщения и что оно в этом чате
     existing_message = MessageService.get_message_by_id(db, message_id)
     if not existing_message:
         raise HTTPException(
