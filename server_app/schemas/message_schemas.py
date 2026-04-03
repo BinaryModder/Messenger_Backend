@@ -1,5 +1,6 @@
 from pydantic import BaseModel, ConfigDict
 from datetime import datetime
+from typing import Optional
 
 
 class MessageBase(BaseModel):
@@ -9,6 +10,10 @@ class MessageBase(BaseModel):
 class MessageCreate(MessageBase):
     chat_id: int
     sender_id: int
+
+
+class MessageUpdate(BaseModel):
+    message_text: Optional[str] = None
 
 
 class MessageResponse(MessageBase):
