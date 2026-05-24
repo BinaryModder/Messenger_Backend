@@ -3,7 +3,7 @@ version: "3.8"
 services:
   db:
     image: postgres:16-alpine
-    container_name: cluster_db
+    container_name: messenger_db
     environment:
       POSTGRES_USER: cluster_user
       POSTGRES_PASSWORD: password
@@ -18,29 +18,19 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - cluster_network
+      - messenger_network
 
   server:
     build:
       context: ./server_app/.
       dockerfile: Dockerfile
-    container_name: cluster_api
+    container_name: messenger_api
     environment:
       DATABASE_URL: postgresql://cluster_user:password@db:5432/clusterdb
       API_HOST: 0.0.0.0
       API_PORT: 8000
       DEBUG: "True"
       LOG_LEVEL: "INFO"
-      # AVALIN integration
-      AVALIN_API_URL: https://api.avalin.ru
-      AVALIN_API_KEY: ""
-      # Business partner features
-      BUSINESS_PARTNER_ENABLED: "True"
-      SPECIAL_OFFERS_ENABLED: "True"
-      SECRET_KEY: "change-me-in-production-use-long-random-string"
-      # AI features
-      DEEPSEEK_API_KEY: ""
-      DEEPSEEK_BASE_URL: https://llms.dotpoin.com/v1
     ports:
       - "8000:8000"
     depends_on:
@@ -49,25 +39,25 @@ services:
     volumes:
       - ./server_app:/app
     networks:
-      - cluster_network
+      - messenger_network
     command: bash -c "sleep 5 && python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload"
 
   frontend:
     build:
       context: ./frontend/.
       dockerfile: Dockerfile
-    container_name: cluster_frontend
+    container_name: messenger_frontend
     ports:
       - "8080:80"
     depends_on:
       - server
     networks:
-      - cluster_network
+      - messenger_network
 
 volumes:
   postgres_data:
 
 networks:
-  cluster_network:
+  messenger_network:
     driver: bridge
 
