@@ -27,8 +27,9 @@ def create_chat(chat_data: ChatCreate, db: Session = Depends(get_db)):
 
 
 @router.get("", response_model=list[ChatResponse])
-def list_chats(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    chats = ChatService.get_all_chats(db, skip, limit)
+def list_chats(skip: int = 0, limit: int = 100, user_id: int | None = None,
+               db: Session = Depends(get_db)):
+    chats = ChatService.get_all_chats(db, skip, limit, user_id)
     return chats
 
 
@@ -42,7 +43,8 @@ def get_chat(chat_id: int, db: Session = Depends(get_db)):
 
 
 @router.patch("/{chat_id}", response_model=ChatResponse)
-def update_chat(chat_id: int, chat_data: ChatUpdate, db: Session = Depends(get_db)):
+def update_chat(chat_id: int, chat_data: ChatUpdate,
+                db: Session = Depends(get_db)):
     try:
         chat = ChatService.update_chat(db, chat_id, chat_data)
         if not chat:
@@ -74,23 +76,25 @@ def delete_chat(chat_id: int, db: Session = Depends(get_db)):
 
 # ============ MESSAGE ENDPOINTS ============
 
-@router.post("/{chat_id}/messages", response_model=MessageResponse, status_code=status.HTTP_201_CREATED)
-def create_message(chat_id: int, message_data: MessageCreate, db: Session = Depends(get_db)):
+@router.post("/{chat_id}/messages", response_model=MessageResponse,
+             status_code=status.HTTP_201_CREATED)
+def create_message(chat_id: int, message_data: MessageCreate,
+                   db: Session = Depends(get_db)):
     # Проверяем существование чата
     chat = ChatService.get_chat_by_id(db, chat_id)
     if not chat:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Chat not found")
-    
+
     # Убеждаемся что chat_id в пути совпадает с телом запроса
     if message_data.chat_id != chat_id:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, 
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail="chat_id in path does not match chat_id in request body")
-    
+
     try:
         message = MessageService.create_message(db, message_data)
-        
+
         # Уведомляем WebSocket подписчиков о новом сообщении
         message_response = {
             "message_id": message.message_id,
@@ -99,18 +103,19 @@ def create_message(chat_id: int, message_data: MessageCreate, db: Session = Depe
             "message_text": message.message_text,
             "sent_at": message.sent_at.isoformat() if message.sent_at else None
         }
-        
+
         # Запускаем async уведомление в sync endpoint
         try:
             asyncio.create_task(
                 websocket_manager.notify_new_message(
-                    chat_id, message_response, exclude_user_id=message.sender_id
+                    chat_id, message_response,
+                    exclude_user_id=message.sender_id
                 )
             )
         except Exception:
             # Игнорируем ошибки WS, главное что сообщение сохранено
             pass
-        
+
         return message
     except ValueError as e:
         raise HTTPException(
@@ -121,13 +126,14 @@ def create_message(chat_id: int, message_data: MessageCreate, db: Session = Depe
 
 
 @router.get("/{chat_id}/messages", response_model=list[MessageResponse])
-def get_messages(chat_id: int, skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+def get_messages(chat_id: int, skip: int = 0, limit: int = 100,
+                 db: Session = Depends(get_db)):
     # Проверяем существование чата
     chat = ChatService.get_chat_by_id(db, chat_id)
     if not chat:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Chat not found")
-    
+
     messages = MessageService.get_messages_by_chat(db, chat_id, skip, limit)
     return messages
 
@@ -139,41 +145,42 @@ def get_message(chat_id: int, message_id: int, db: Session = Depends(get_db)):
     if not chat:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Chat not found")
-    
+
     message = MessageService.get_message_by_id(db, message_id)
     if not message:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Message not found")
-    
+
     # Проверяем что сообщение принадлежит этому чату
     if message.chat_id != chat_id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Message not found in this chat")
-    
+
     return message
 
 
 @router.patch("/{chat_id}/messages/{message_id}", response_model=MessageResponse)
-def update_message(chat_id: int, message_id: int, message_data: MessageUpdate, db: Session = Depends(get_db)):
+def update_message(chat_id: int, message_id: int, message_data: MessageUpdate,
+                   db: Session = Depends(get_db)):
     # Проверяем существование чата
     chat = ChatService.get_chat_by_id(db, chat_id)
     if not chat:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Chat not found")
-    
+
     # Проверяем существование сообщения и что оно в этом чате
     existing_message = MessageService.get_message_by_id(db, message_id)
     if not existing_message:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Message not found")
-    
+
     if existing_message.chat_id != chat_id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Message not found in this chat")
-    
+
     try:
         message = MessageService.update_message(db, message_id, message_data)
-        
+
         # Уведомляем WebSocket подписчиков об обновлении сообщения
         if message:
             message_response = {
@@ -183,14 +190,15 @@ def update_message(chat_id: int, message_id: int, message_data: MessageUpdate, d
                 "message_text": message.message_text,
                 "sent_at": message.sent_at.isoformat() if message.sent_at else None
             }
-            
+
             try:
                 asyncio.create_task(
-                    websocket_manager.notify_message_updated(chat_id, message_response)
+                    websocket_manager.notify_message_updated(
+                        chat_id, message_response)
                 )
             except Exception:
                 pass
-        
+
         return message
     except ValueError as e:
         raise HTTPException(
@@ -201,29 +209,30 @@ def update_message(chat_id: int, message_id: int, message_data: MessageUpdate, d
 
 
 @router.delete("/{chat_id}/messages/{message_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_message(chat_id: int, message_id: int, db: Session = Depends(get_db)):
+def delete_message(chat_id: int, message_id: int,
+                   db: Session = Depends(get_db)):
     # Проверяем существование чата
     chat = ChatService.get_chat_by_id(db, chat_id)
     if not chat:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Chat not found")
-    
+
     # Проверяем существование сообщения и что оно в этом чате
     existing_message = MessageService.get_message_by_id(db, message_id)
     if not existing_message:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Message not found")
-    
+
     if existing_message.chat_id != chat_id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Message not found in this chat")
-    
+
     try:
         deleted = MessageService.delete_message(db, message_id)
         if not deleted:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Message not found")
-        
+
         # Уведомляем WebSocket подписчиков об удалении сообщения
         try:
             asyncio.create_task(
@@ -231,7 +240,7 @@ def delete_message(chat_id: int, message_id: int, db: Session = Depends(get_db))
             )
         except Exception:
             pass
-        
+
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))

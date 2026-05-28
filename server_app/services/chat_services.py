@@ -27,7 +27,8 @@ class ChatService:
         return db.query(Chat).filter(Chat.chat_id == chat_id).first()
 
     @staticmethod
-    def update_chat(db: Session, chat_id: int, chat_data: ChatUpdate) -> Optional[Chat]:
+    def update_chat(db: Session, chat_id: int,
+                    chat_data: ChatUpdate) -> Optional[Chat]:
         chat = db.query(Chat).filter(Chat.chat_id == chat_id).first()
         if not chat:
             return None
@@ -60,5 +61,9 @@ class ChatService:
             raise ValueError("Error deleting chat")
 
     @staticmethod
-    def get_all_chats(db: Session, skip: int = 0, limit: int = 100) -> list[Chat]:
-        return db.query(Chat).offset(skip).limit(limit).all()
+    def get_all_chats(db: Session, skip: int = 0, limit: int = 100,
+                      user_id: int | None = None) -> list[Chat]:
+        query = db.query(Chat)
+        if user_id is not None:
+            query = query.filter(Chat.id == user_id)
+        return query.offset(skip).limit(limit).all()
