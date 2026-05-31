@@ -25,7 +25,7 @@ API Docs: http://localhost:8000/docs
 
 ### Chats
 - `POST /api/v1/chats` - Создать чат
-- `GET /api/v1/chats` - Список чатов
+- `GET /api/v1/chats?user_id={id}` - Список чатов пользователя (только те, где он участник)
 - `GET /api/v1/chats/{id}` - Информация о чате
 - `PATCH /api/v1/chats/{id}` - Обновить чат
 - `DELETE /api/v1/chats/{id}` - Удалить чат

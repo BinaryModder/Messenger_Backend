@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from models.chat_model import Chat
+from models.user_chat_model import UserChat
 from schemas.chat_schemas import ChatCreate, ChatUpdate
 from typing import Optional
 
@@ -61,9 +62,15 @@ class ChatService:
             raise ValueError("Error deleting chat")
 
     @staticmethod
-    def get_all_chats(db: Session, skip: int = 0, limit: int = 100,
-                      user_id: int | None = None) -> list[Chat]:
-        query = db.query(Chat)
-        if user_id is not None:
-            query = query.filter(Chat.id == user_id)
-        return query.offset(skip).limit(limit).all()
+    def get_chats_for_user(
+        db: Session, user_id: int, skip: int = 0, limit: int = 100
+    ) -> list[Chat]:
+        """Чаты, в которых пользователь состоит (таблица user_chats)."""
+        return (
+            db.query(Chat)
+            .join(UserChat, UserChat.chat_id == Chat.chat_id)
+            .filter(UserChat.user_id == user_id)
+            .offset(skip)
+            .limit(limit)
+            .all()
+        )
